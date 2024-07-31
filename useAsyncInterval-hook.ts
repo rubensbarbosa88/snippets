@@ -20,15 +20,21 @@ type UseIntervalAsyncOptions = {
    * Valor padrão é true.
    */
   isActive?: boolean;
+
+  /**
+   * logErrorOnce: Se true, o erro será logado no console apenas uma vez em caso de falha na Promise.
+   */
+  logErrorOnce?: boolean;
 };
 
-const useIntervalAsync = (
+export const useIntervalAsync = (
   callback: () => Promise<void> | void,
   options: UseIntervalAsyncOptions
 ) => {
-  const { delay, waitFirst, isActive = true } = options;
+  const { delay, waitFirst, isActive = true, logErrorOnce } = options;
   const isMounted = useRef(true);
   const savedCallback = useRef(callback);
+  const errorLogged = useRef(false);
 
   // Lembrar da última função de callback
   useEffect(() => {
@@ -38,7 +44,14 @@ const useIntervalAsync = (
   useEffect(() => {
     const tick = async () => {
       if (isMounted.current) {
-        await Promise.resolve(savedCallback.current());
+        try {
+          await Promise.resolve(savedCallback.current());
+        } catch (error) {
+          if (logErrorOnce && !errorLogged.current) {
+            console.error('Error executing callback:', error);
+            errorLogged.current = true;
+          }
+        }
         if (isMounted.current) {
           setTimeout(tick, delay);
         }
@@ -63,7 +76,5 @@ const useIntervalAsync = (
     return () => {
       isMounted.current = false;
     };
-  }, [delay, waitFirst, isActive]);
+  }, [delay, waitFirst, isActive, logErrorOnce]);
 };
-
-export default useIntervalAsync;
